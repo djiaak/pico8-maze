@@ -135,7 +135,7 @@ function cell:calc_distances()
 	end
 	return dist
 end
--->8
+
 grid = {}
 grid.__index = grid
 function grid:create(rows, cols)
@@ -365,6 +365,52 @@ function aldous_broder:on(grid)
 	end
 end
 -->8
+hunt_and_kill = {}
+hunt_and_kill.__index=hunt_and_kill
+function hunt_and_kill:create()
+	local o = {}
+	setmetatable(o, hunt_and_kill)
+	return o
+end
+
+function hunt_and_kill:filter(cells, has_links)
+	local filtered_cells={}
+	for _,cell in pairs(cells) do
+		if not has_links and count(cell:get_link_keys())==0 then add(filtered_cells, cell) end
+		if has_links and count(cell:get_link_keys())>0 then add(filtered_cells, cell) end
+	end
+	return filtered_cells
+end
+
+function hunt_and_kill:on(grid)
+	local current=grid:random_cell()
+	while current!=nil do
+		local unvisited_neighbors=
+			self:filter(current:neighbors(),false)
+		
+		if count(unvisited_neighbors)>0 then
+			local neighbor=sample(unvisited_neighbors)
+			current:link(neighbor,true)
+			current=neighbor
+		else
+			current=nil
+			local cell_iter=grid:each_cell()
+			while true do
+				local cell=cell_iter()
+				if cell==nil then break end
+				local visited_neighbors=
+					self:filter(cell:neighbors(),true)
+				if count(cell:get_link_keys())==0 and count(visited_neighbors)>0 then
+					current=cell
+					neighbor=sample(visited_neighbors)
+					current:link(neighbor,true)
+					break
+				end
+			end
+		end
+	end
+end
+-->8
 distances = {}
 distances.__index = distances
 function distances:create(root)
@@ -417,7 +463,8 @@ local screen_width = tile_size*max_col_count
 local maze_types = {
 	{ type=binary_tree, name="binary tree", color=12 },
 	{ type=sidewinder, name="sidewinder", color=8 },
-	{ type=aldous_broder, name="aldous-broder", color=11 }
+	{ type=aldous_broder, name="aldous-broder", color=11 },
+	{ type=hunt_and_kill, name="hunt and kill", color=9 }
 }
 
 --menu stuff
@@ -520,6 +567,7 @@ function get_high_perfect_data_idx(i)
 end
 
 function transfer_to_lose()
+	sfx(2)
 	local high_score_idx=get_high_score_data_idx(selected_maze_type_idx)
 	local high_perfect_idx=get_high_perfect_data_idx(selected_maze_type_idx)
 	local high_score=dget(high_score_idx)
@@ -575,6 +623,7 @@ function update_menu()
 end
 
 function next_maze()
+  sfx(1)
 	score = score + 1
 	if perfect then score_perfect = score_perfect + 1 end
 	play_time_start = play_time_start + play_time_increment
@@ -595,6 +644,9 @@ function update_play()
 	if perfect and dist:get(c) != dist:get(neighbor) + 1 then
 		perfect=false
 		shake_until_time = time() + 1
+		sfx(0)
+	else
+		sfx(3)
 	end
 	player_c = neighbor:get_col()
 	player_r = neighbor:get_row()
@@ -603,8 +655,8 @@ function update_play()
 end
 
 function draw_goal(dist)
-	local current_cell = g:lookup(end_r, end_c)
-	local current_dist = dist:get(current_cell)
+	local current_cell=g:lookup(end_r, end_c)
+	local current_dist=dist:get(current_cell)
 	while current_dist>0 do
 		for k,neighbor in pairs(current_cell:neighbors()) do
 			if dist:get(neighbor) == current_dist - 1 and current_cell:is_linked(neighbor) then
@@ -698,5 +750,7 @@ __gfx__
 333d333309aaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 033333009aa009aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
-000100000215005150061500716008160091500a1500b1500c1500d1500e1500f1401214012140101400e1400e1400e1400f15014150161501915019150161501f1402314027140221401b140171500c1500c150
-000100001055013550145501455014550135501255012550115501155011550105501055012550145501a5501c5501e550205502355023550235501f5501b5501e55020550215502355025550265502755028550
+000200003c65037650326502e6602a6602865022650206501c6501a65019650186403064031640326403364032640306402d6502965027650226501f6501b6501964016640156401464012640116501165011650
+000100001555016550175501755017550165501455013550105500e5500c5500c5500a5500855007550075500655006550065500655007550085500a5500c5500e5501055013550155501b550215502255026550
+0003000037450344502f4502c4502a450274502545022450214501d4501b45018450164501445011450104500e4500b4500a45008450054500445003450024500145003450024500145001450014500245002450
+000100000964009640086300762004610026500165001650016000160001600016000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
