@@ -194,7 +194,7 @@ end
 function grid:random_cell()
 	local row = flr(rnd(self.rows)) + 1
 	local col = flr(rnd(self.cols)) + 1
-	return self.lookup(row,col)
+	return self:lookup(row,col)
 end
 
 function grid:size()
@@ -342,7 +342,28 @@ function sidewinder:adjust_goal_for_bias(start_row, start_col, goal_row, goal_co
 	}
 
 end
+-->8
+aldous_broder = {}
+aldous_broder.__index = aldous_broder
+function aldous_broder:create()
+	local o = {}
+	setmetatable(o, aldous_broder)
+	return o
+end
 
+function aldous_broder:on(grid)
+	local cell=grid:random_cell()
+	local unvisited=grid:size()-1
+
+	while unvisited>0 do
+		local neighbor=sample(cell:neighbors())
+		if count(neighbor:get_link_keys())==0 then
+			cell:link(neighbor, true)
+			unvisited=unvisited-1
+		end
+		cell=neighbor
+	end
+end
 -->8
 distances = {}
 distances.__index = distances
@@ -394,7 +415,8 @@ local tile_size=8
 local screen_width = tile_size*max_col_count
 local maze_types = {
 	{ type=binary_tree, name="binary tree", color=12 },
-	{ type=sidewinder, name="sidewinder", color=8 }
+	{ type=sidewinder, name="sidewinder", color=8 },
+	{ type=aldous_broder, name="aldous-broder", color=11 }
 }
 
 --menu stuff
@@ -616,9 +638,14 @@ function draw_play()
 	cls(maze_types[selected_maze_type_idx].color)
 	
 	local map_x=0
-	if shake_until_time > time() then map_x=flr(time()*32) % 2 end 
+	local wrong_way_color
+	if shake_until_time > time() then
+		local shake_mod=flr(time()*32) % 2
+		map_x=shake_mod
+		if shake_mod==0 then wrong_way_color=8 else wrong_way_color=7 end 
+	end 
 	map(0,0,map_x,0,col_count,row_count)
-	if shake_until_time > time() then print_center("wrong way!", 50, 8) end 
+	if shake_until_time > time() then print_center("wrong way!", 52, wrong_way_color) end 
 	draw_timer()
 	local flip_player = flr(time()*2) % 2 == 0
 	local flip_goal = flr(time()*4) % 2 == 0
