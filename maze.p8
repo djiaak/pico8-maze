@@ -93,10 +93,10 @@ function cell:get_w()
 end
 
 function cell:neighbor_str(dir)
-	if dir == 'n' then return self:get_n() end
-	if dir == 'e' then return self:get_e() end
-	if dir == 's' then return self:get_s() end
-	if dir == 'w' then return self:get_w() end
+	if dir == "n" then return self:get_n() end
+	if dir == "e" then return self:get_e() end
+	if dir == "s" then return self:get_s() end
+	if dir == "w" then return self:get_w() end
 end
 
 function cell:get_row()
@@ -280,7 +280,7 @@ end
 
 function binary_tree:adjust_goal_for_bias(start_row, start_col, goal_row, goal_col, row_count, col_count)
 	--northern and eastern row always clear - if start is here
-	--move goal to southwestern corner so solution isn't trivial
+	--move goal to southwestern corner so solution isn"t trivial
 	if start_row==1 or start_col==col_count then
 		return {
 			goal_row=row_count,
@@ -328,7 +328,7 @@ end
 
 function sidewinder:adjust_goal_for_bias(start_row, start_col, goal_row, goal_col, row_count, col_count)
 	--northern row is always clear - if start is on the 
-	--northern row move goal to southern so solution isn't 
+	--northern row move goal to southern so solution isn"t 
 	--trivial
 	if start_row == 1 then
 		return {
@@ -402,6 +402,7 @@ function grid_to_map(g)
 	end
 end
 
+
 local game_state_menu=0
 local game_state_play=1
 local game_state_lose=2
@@ -455,6 +456,13 @@ function _update()
 	if current_game_state==game_state_menu then update_menu() end
 	if current_game_state==game_state_play then update_play() end
 	if current_game_state==game_state_lose then update_lose() end
+end
+
+function print_center(str, y, color, x_offset)
+	local x=screen_width/2 - #str*2
+	if x_offset!=nil then x=x+x_offset*2 end
+	print(str, x, y, color)
+	return x
 end
 
 function init_start_end_coords(s_x, s_y)
@@ -524,12 +532,12 @@ end
 
 function get_button_pressed()
 	local button=nil
-  if btn(0) then button = 'w' end
-  if btn(1) then button = 'e' end
-  if btn(2) then button = 'n' end
-  if btn(3) then button = 's' end
-  if btn(4) then button = 'o' end
-  if btn(5) then button = 'x' end
+  if btn(0) then button = "w" end
+  if btn(1) then button = "e" end
+  if btn(2) then button = "n" end
+  if btn(3) then button = "s" end
+  if btn(4) then button = "o" end
+  if btn(5) then button = "x" end
 	if button==nil then
 		button_down=nil
 		return nil
@@ -543,23 +551,25 @@ function draw_menu()
 	cls(0)
 	local y = 20
 	local flip = flr(time()*2) % 2 == 0
-	print_center('select a maze algorithm', y, 7)
+	print_center("select a maze algorithm", y, 7)
 	y=y+tile_size*2
 	for _,maze_type in pairs(maze_types) do
-		local x=print_center(maze_type.name .. ' ' .. maze_type.high_perfect .. '/' .. maze_type.high_score, 
+		local x=print_center(maze_type.name .. " " .. maze_type.high_perfect .. "/" .. maze_type.high_score, 
 			y, maze_type.color)
 		if maze_types[selected_maze_type_idx]==maze_type then spr(spr_player, x-11, y-2,1,1,flip) end
 		y = y + tile_size
 	end
+	y=y+tile_size*2
+	print_center("⬆️⬇️select ❎start", y, 7, -3)
 end
 
 function update_menu()
 	local button = get_button_pressed()
 	local dir=0
 
-	if button=='x' then transfer_to_play() end
-	if button=='s' then dir=1 end
-	if button=='n' then dir=-1 end
+	if button=="x" then transfer_to_play() end
+	if button=="s" then dir=1 end
+	if button=="n" then dir=-1 end
 	selected_maze_type_idx = selected_maze_type_idx + dir
 	selected_maze_type_idx = (selected_maze_type_idx-1) % count(maze_types) + 1
 end
@@ -667,11 +677,7 @@ function draw_lose()
 	print_center("total mazes: " .. score, y + tile_size*3, 8)
 end
 
-function print_center(str, y, color)
-	local x=screen_width/2 - #str*2
-	print(str, x, y, color)
-	return x
-end
+
 
 
 __gfx__
@@ -688,9 +694,9 @@ __gfx__
 0a1a1a00009aaa000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0aaaaa0099aaaaaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0a111a000aaaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-bbaaabbb009aaa000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-bbbdbbbb09aaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0bbbbb009aa009aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+33aaa333009aaa000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+333d333309aaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+033333009aa009aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
 000100000215005150061500716008160091500a1500b1500c1500d1500e1500f1401214012140101400e1400e1400e1400f15014150161501915019150161501f1402314027140221401b140171500c1500c150
 000100001055013550145501455014550135501255012550115501155011550105501055012550145501a5501c5501e550205502355023550235501f5501b5501e55020550215502355025550265502755028550
