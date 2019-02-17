@@ -1,6 +1,75 @@
 pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
+local masks={
+	nil,
+
+	'................' ..
+	'................' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'..xxxxxxxxxxxx..' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'.......xx.......' ..
+	'................' ..
+	'................',
+
+	'................' ..
+	'.xxx........xxx.' ..
+	'.xxx........xxx.' ..
+	'.xxx........xxx.' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'.xxx........xxx.' ..
+	'.xxx........xxx.' ..
+	'.xxx........xxx.' ..
+	'................',
+
+	'................' ..
+	'................' ..
+	'..xx........xx..' ..
+	'..xx........xx..' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'................' ..
+	'..x..........x..' ..
+	'...xx......xx...' ..
+	'.....xxxxxx.....' ..
+	'................' ..
+	'................',
+
+	'................' ..
+	'................' ..
+	'................' ..
+	'x..............x' ..
+	'xx............xx' ..
+	'xxx..........xxx' ..
+	'xxxx........xxxx' ..
+	'xxxxx......xxxxx' ..
+	'xxxx........xxxx' ..
+	'xxx..........xxx' ..
+	'xx............xx' ..
+	'x..............x' ..
+	'................' ..
+	'................' ..
+	'................',
+}
+
+
 function sample(table)
 	local idx = flr(rnd(count(table)))
 	return table[idx+1]
@@ -14,12 +83,13 @@ function debug_print(tbl)
 end
 
 function grid_to_map(g)
-	local iter = g:each_cell()
-	while true do
-		local cell = iter()
-		if cell == nil then break end
-		local links = cell:links_bits()
-		mset(cell:get_col()-1, cell:get_row()-1, links)
+	for r=1,g:get_rows(),1 do
+		for c=1,g:get_cols(),1 do
+			local cell = g:lookup(r,c)
+			local links=0
+			if cell!=nil then links=cell:links_bits() end
+			mset(c-1, r-1, links)
+		end
 	end
 end
 
@@ -148,11 +218,12 @@ end
 
 grid = {}
 grid.__index = grid
-function grid:create(rows, cols)
+function grid:create(mask)
 	local o = {}
 	setmetatable(o, grid)
-	o.rows = rows
-	o.cols = cols
+	o.mask = mask
+	o.rows = mask:get_rows()
+	o.cols = mask:get_cols()
 	o.grid = o:prepare_grid()
 	o:configure_cells(o.grid)
 	return o
@@ -173,7 +244,7 @@ function grid:prepare_grid()
 		g[r] = {}
 		for c = 1,self.cols,1
 		do
-			g[r][c] = cell:create(r,c)
+			if self.mask:lookup(r,c) then g[r][c]=cell:create(r,c) end
 		end
 	end
 	return g
@@ -188,27 +259,26 @@ function grid:lookup(r,c)
 end
 
 function grid:configure_cells(g)
-	for r = 1,self.rows,1
-	do
-		for c = 1,self.cols,1
-		do
-			local cell=self:lookup(r,c)
-			cell:set_n(self:lookup(r-1,c))
-			cell:set_s(self:lookup(r+1,c))
-			cell:set_w(self:lookup(r,c-1))
-			cell:set_e(self:lookup(r,c+1))
-		end
+	local iter=self:each_cell()
+	while true do
+		local cell=iter()
+		if cell==nil then break end
+		local r=cell:get_row()
+		local c=cell:get_col()
+		cell:set_n(self:lookup(r-1,c))
+		cell:set_s(self:lookup(r+1,c))
+		cell:set_w(self:lookup(r,c-1))
+		cell:set_e(self:lookup(r,c+1))
 	end
 end
 
 function grid:random_cell()
-	local row = flr(rnd(self.rows)) + 1
-	local col = flr(rnd(self.cols)) + 1
-	return self:lookup(row,col)
+	local loc=self.mask:random_location()
+	return self:lookup(loc[1],loc[2])
 end
 
 function grid:size()
-	return self.rows * self.cols
+	return self.mask:count()
 end
 
 function grid:each_row()
@@ -227,12 +297,14 @@ function grid:each_cell()
  while true do
  	local i = 0
  	return function()
+	 	::continue::
  		i = i + 1
 		if i > n then
 			i = 1
 			el = iter()
 		end
 		if el == nil then return nil end
+		if el[i] == nil then goto continue end
 		return el[i]
  	end
  end
@@ -301,6 +373,62 @@ function distances:get_cells()
 	end
 	return keys
 end
+
+mask = {}
+mask.__index=mask
+function mask:create(rows,cols,mask_str)
+	local o = {}
+	setmetatable(o, mask)
+	o.rows=rows
+	o.cols=cols
+	o.bits={}
+	for r=1,rows,1 do
+		o.bits[r]={}
+		for c=1,cols,1 do
+			local mask_char
+			if mask_str==nil then mask_char=' ' else mask_char=sub(mask_str,c+(r-1)*cols,c+(r-1)*cols) end
+			o.bits[r][c]=mask_char!='x'
+		end
+	end
+	return o
+end
+
+function mask:lookup(row,col)
+	if row<=0 or col<=0 or row>self.rows or col>self.cols then return false end
+	return self.bits[row][col]
+end
+
+function mask:set(row,col,is_on)
+	self.bits[row][col]=is_on
+end
+
+function mask:count()
+	local count=0
+	for r=1,self.rows,1 do
+		for c=1,self.cols,1 do
+			if self.bits[r][c] then count=count+1 end
+		end
+	end
+	return count
+end
+
+function mask:random_location()
+	while true do
+		print('k',0,0)
+		local row=flr(rnd(self.rows))+1
+		local col=flr(rnd(self.cols))+1
+		if self.bits[row][col] then return {row,col} end
+	end
+end
+
+function mask:get_rows()
+	return self.rows
+end
+
+function mask:get_cols()
+	return self.cols
+end
+
 -->8
 binary_tree = {}
 binary_tree.__index = binary_tree
@@ -353,12 +481,10 @@ function sidewinder:on(grid)
 		local row = r_iter()
 		if row == nil then break end
 		local run = {}
-		for i=1,count(row),1
-		do
-			local cell = row[i]
-			add(run, cell)
-			local at_eastern_bound = cell:get_e() == nil
-			local at_northern_bound = cell:get_n() == nil
+		for _,cell in pairs(row) do
+			add(run,cell)
+			local at_eastern_bound=cell:get_e()==nil
+			local at_northern_bound=cell:get_n()==nil
 			local should_close_out = at_eastern_bound or 
 				(not at_northern_bound and flr(rnd(2))==0)
 			if should_close_out then
@@ -410,6 +536,10 @@ function aldous_broder:on(grid)
 		cell=neighbor
 	end
 end
+
+function aldous_broder:supports_mask()
+	return true
+end
 -->8
 hunt_and_kill = {}
 hunt_and_kill.__index=hunt_and_kill
@@ -446,6 +576,10 @@ function hunt_and_kill:on(grid)
 			end
 		end
 	end
+end
+
+function hunt_and_kill:supports_mask()
+	return true
 end
 -->8
 growing_tree = {}
@@ -497,6 +631,9 @@ function growing_tree:get_factor()
 	return self.factor
 end
 
+function growing_tree:supports_mask()
+	return true
+end
 -->8
 recursive_division = {}
 recursive_division.__index=recursive_division
@@ -643,9 +780,16 @@ function init_start_end_coords(s_x, s_y)
 	end
 end
 
+
+
 function init_maze()
 	perfect=true
-	g = grid:create(row_count,col_count)
+	local current_mask=nil
+	if maze_types[selected_maze_type_idx].type.supports_mask!=nil then
+		current_mask=masks[flr(rnd(count(masks)))+1]
+	end
+	local m=mask:create(row_count,col_count, current_mask)
+	g = grid:create(m)
   maze_types[selected_maze_type_idx].type:create():on(g)
 	dist = g:lookup(end_r,end_c):calc_distances()
 	grid_to_map(g)
@@ -839,6 +983,7 @@ function draw_lose()
 	print_center("perfect mazes: " .. score_perfect, y + tile_size*2, 8)
 	print_center("total mazes: " .. score, y + tile_size*3, 8)
 end
+
 
 
 
