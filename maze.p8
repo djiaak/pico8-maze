@@ -12,7 +12,17 @@ function debug_print(tbl)
 		print(tbl[i])
 	end
 end
--->8
+
+function grid_to_map(g)
+	local iter = g:each_cell()
+	while true do
+		local cell = iter()
+		if cell == nil then break end
+		local links = cell:links_bits()
+		mset(cell:get_col()-1, cell:get_row()-1, links)
+	end
+end
+
 cell = {}
 cell.__index = cell
 function cell:create(row, col)
@@ -255,6 +265,42 @@ function grid:to_string()
 	end
 	return lines
 end
+
+function filter_has_links(cells, has_links)
+	local filtered_cells={}
+	for _,cell in pairs(cells) do
+		if not has_links and count(cell:get_link_keys())==0 then add(filtered_cells, cell) end
+		if has_links and count(cell:get_link_keys())>0 then add(filtered_cells, cell) end
+	end
+	return filtered_cells
+end
+
+distances = {}
+distances.__index = distances
+function distances:create(root)
+	local o = {}
+	setmetatable(o, distances)
+	o.root = root
+	o.cells = {}
+	o.cells[root] = 0
+	return o
+end
+
+function distances:get(cell)
+	return self.cells[cell]
+end
+
+function distances:set(cell, distance)
+	self.cells[cell] = distance
+end
+
+function distances:get_cells()
+	local keys={}
+	for k,_ in pairs(self.cells) do
+		add(keys, k)
+	end
+	return keys
+end
 -->8
 binary_tree = {}
 binary_tree.__index = binary_tree
@@ -373,20 +419,11 @@ function hunt_and_kill:create()
 	return o
 end
 
-function hunt_and_kill:filter(cells, has_links)
-	local filtered_cells={}
-	for _,cell in pairs(cells) do
-		if not has_links and count(cell:get_link_keys())==0 then add(filtered_cells, cell) end
-		if has_links and count(cell:get_link_keys())>0 then add(filtered_cells, cell) end
-	end
-	return filtered_cells
-end
-
 function hunt_and_kill:on(grid)
 	local current=grid:random_cell()
 	while current!=nil do
 		local unvisited_neighbors=
-			self:filter(current:neighbors(),false)
+			filter_has_links(current:neighbors(),false)
 		
 		if count(unvisited_neighbors)>0 then
 			local neighbor=sample(unvisited_neighbors)
@@ -399,7 +436,7 @@ function hunt_and_kill:on(grid)
 				local cell=cell_iter()
 				if cell==nil then break end
 				local visited_neighbors=
-					self:filter(cell:neighbors(),true)
+					filter_has_links(cell:neighbors(),true)
 				if count(cell:get_link_keys())==0 and count(visited_neighbors)>0 then
 					current=cell
 					neighbor=sample(visited_neighbors)
@@ -411,42 +448,114 @@ function hunt_and_kill:on(grid)
 	end
 end
 -->8
-distances = {}
-distances.__index = distances
-function distances:create(root)
+growing_tree = {}
+growing_tree.__index=growing_tree
+function growing_tree:create()
 	local o = {}
-	setmetatable(o, distances)
-	o.root = root
-	o.cells = {}
-	o.cells[root] = 0
+	setmetatable(o, growing_tree)
+
+	o.factor=rnd(1)
 	return o
 end
 
-function distances:get(cell)
-	return self.cells[cell]
-end
-
-function distances:set(cell, distance)
-	self.cells[cell] = distance
-end
-
-function distances:get_cells()
-	local keys={}
-	for k,_ in pairs(self.cells) do
-		add(keys, k)
+function growing_tree_selector(list, gt)
+	--each maze has a factor, which influences which algorithm
+	--is chosen more frequently
+	if rnd(1)>gt:get_factor() then
+		--more corners, dead ends (simplified prims)
+		return sample(list)
 	end
-	return keys
+	--longer corridors (recursive backtracker)
+	return list[count(list)]
+end
+
+function growing_tree:on_internal(grid,start_at,func)
+	if start_at==nil then start_at=grid:random_cell() end
+
+	local active={}
+	add(active,start_at)
+	
+	while count(active)>0 do
+		local cell=func(active,self)
+		local available_neighbors=filter_has_links(
+			cell:neighbors(),false)
+		if count(available_neighbors)>0 then
+			local neighbor=sample(available_neighbors)
+			cell:link(neighbor,true)
+			add(active,neighbor)
+		else
+			del(active,cell)
+		end
+	end
+end
+
+function growing_tree:on(grid)
+	self:on_internal(grid,nil,growing_tree_selector)
+end
+
+function growing_tree:get_factor() 
+	return self.factor
+end
+
+-->8
+recursive_division = {}
+recursive_division.__index=recursive_division
+function recursive_division:create()
+	local o = {}
+	setmetatable(o, recursive_division)
+	return o
+end
+
+function recursive_division:on(grid)
+	self.grid=grid
+	local cell_iter = grid:each_cell()
+	while true do
+		local cell=cell_iter()
+		if cell==nil then break end
+
+		for _,n in pairs(cell:neighbors()) do
+			cell:link(n,false)
+		end
+	end
+	self:divide(0,0,grid:get_rows(),grid:get_cols())
+end
+
+function recursive_division:divide(row,col,height,width)
+	if height<=1 or width<=1 then return end
+	if height>width then
+		self:divide_horizontally(row,col,height,width)
+	else
+		self:divide_vertically(row,col,height,width)
+	end
+end
+
+function recursive_division:divide_horizontally(row,col,height,width)
+	local divide_south_of=flr(rnd(height-1))
+	local passage_at=flr(rnd(width))
+	for x=0,width-1,1 do
+		if passage_at!=x then
+			local cell=self.grid:lookup(row+divide_south_of+1,col+x+1)
+			cell:unlink(cell:get_s(),true)
+		end
+	end
+	self:divide(row,col,divide_south_of+1,width)
+	self:divide(row+divide_south_of+1,col,height-divide_south_of-1,width)
+end
+
+function recursive_division:divide_vertically(row,col,height,width)
+	local divide_east_of=flr(rnd(width-1))
+	local passage_at=flr(rnd(height))
+	for y=0,height-1,1 do
+		if passage_at!=y then
+			local cell=self.grid:lookup(row+y+1,col+divide_east_of+1)
+			cell:unlink(cell:get_e(),true)
+		end
+	end
+	self:divide(row,col,height,divide_east_of+1)
+	self:divide(row,col+divide_east_of+1,height,width-divide_east_of-1)
 end
 -->8
-function grid_to_map(g)
-	local iter = g:each_cell()
-	while true do
-		local cell = iter()
-		if cell == nil then break end
-		local links = cell:links_bits()
-		mset(cell:get_col()-1, cell:get_row()-1, links)
-	end
-end
+
 
 
 local game_state_menu=0
@@ -464,7 +573,9 @@ local maze_types = {
 	{ type=binary_tree, name="binary tree", color=12 },
 	{ type=sidewinder, name="sidewinder", color=8 },
 	{ type=aldous_broder, name="aldous-broder", color=11 },
-	{ type=hunt_and_kill, name="hunt and kill", color=9 }
+	{ type=hunt_and_kill, name="hunt and kill", color=9 },
+	{ type=growing_tree, name="growing tree", color=14 },
+	{ type=recursive_division, name="recursive division", color=15 }
 }
 
 --menu stuff
