@@ -1,2 +1,0 @@
-pico8 -x build.p8
-scp -i ~/.ssh/piano_key_pair.pem ../maze.html ../maze.js ubuntu@ec2-52-73-254-0.compute-1.amazonaws.com:~/maze-web
